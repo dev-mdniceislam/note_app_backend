@@ -1,19 +1,40 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 
-module.exports = async (req, res, next) => {
+const verifyToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1]; // Bearer TOKEN
+  console.log(token);
+
+  if (!token) {
+    return res.error(
+      401,
+      'Access denied. No token provided. Please login again',
+      null,
+    );
+  }
+
   try {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.split(' ')[1] : null;
-    if (!token) return res.status(401).json({ message: 'Token dewa hoyni' });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(401).json({ message: 'User paoa jayni' });
-
-    req.user = user;
+    const verified = jwt.verify(
+      token,
+      process.env.JWT_SECRET || 'your_secret_key',
+    );
+    req.user = verified;
     next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Token valid na ba expired' });
+  } catch {
+    return res.error(403, 'Invalid or expired token. Please login again', null);
   }
 };
+
+const generateToken = (id, role) => {
+  return jwt.sign({ id, role }, process.env.JWT_SECRET || 'your_secret_key', {
+    expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+  });
+};
+
+const restrictTo =
+  (...roles) =>
+  (req, res, next) =>
+    roles.includes(req.user?.role)
+      ? next()
+      : res.error(403, 'You do not have permission to perform this action');
+
+module.exports = { verifyToken, generateToken, restrictTo };

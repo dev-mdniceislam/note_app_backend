@@ -1,37 +1,29 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-
+const connectDB = require('./app/config/db');
+const responseHandler = require('./app/middleware/responseHandler');
+const errorHandler = require('./app/middleware/errorHandlerMiddleware');
 const authRoutes = require('./app/routes/auth');
 const noteRoutes = require('./app/routes/notes');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-app.get('/', (req, res) => res.json({ message: 'Notes API cholche' }));
+app.use(express.json());
+app.use(responseHandler); // res.success() / res.error() ব্যবহারের জন্য আগে লাগবে
+
 app.use('/api/auth', authRoutes);
 app.use('/api/notes', noteRoutes);
 
-// 404
-app.use((req, res) => res.status(404).json({ message: 'Route paoa jayni' }));
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: 'Server e somossha hoyeche' });
+// 404 handler
+app.use((req, res) => {
+  res.error(404, `Route not found: ${req.originalUrl}`);
 });
+
+// সবার শেষে error handler
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('MongoDB connected');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+connectDB().then(() => {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+});
